@@ -60,14 +60,8 @@ class GameManager(BaseSystem):
             for tile in row:
                 tile.draw(screen)
 
-        for tower in self.towers:
-            tower.draw(screen)
-    
         self.enemies.draw(screen)
     def update(self):
-        mouse_pos = pygame.mouse.get_pos()
-        self.towers.update(mouse_pos)
-
         # Enemy Update & Escape Check
         for enemy in self.enemies:
             status = enemy.update()
@@ -82,15 +76,6 @@ class GameManager(BaseSystem):
         col, row = get_tile_coords(mouse_pos)
         
         print("Clicked Tile:", row, col)
-
-    def attempt_buy(self, cost):
-        """ Checks if we can afford cost (of tower) """
-        if self.money >= cost:
-            self.money -= cost
-            return True
-        else:
-            print(f"Not enough money! Need ${cost}")
-            return False
 
     def setup_map(self, map): 
         # Iterate over the grid (row, col)
@@ -107,18 +92,6 @@ class GameManager(BaseSystem):
                 grid_row.append(Tile(col, row, key, BLOCK_SIZE, colour=color))
             self.grid.append(grid_row)
         self.path = self.sort_path(path_coords, COLS, ROWS, BLOCK_SIZE)
-       
-    def get_hovered(self):
-        for tower in self.towers:
-            if tower.is_hovered:
-                return tower
-        return None
-    def is_selected(self, tower_type):
-        """ Returns True if the given tower type is the one currently active. """
-        if self.selected_type == tower_type:
-            return True
-        else:
-            return False
     def create_enemy(self, hp, speed, bounty):
         start_pos = self.path[0]
         new_enemy = Enemy(start_pos.x, start_pos.y, hp, speed, bounty)

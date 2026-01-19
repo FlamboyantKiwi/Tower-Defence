@@ -46,6 +46,55 @@ SIDEBAR_BG = (50, 50, 50) # Dark Grey for sidebar
 TEXT_COLOR = (255, 255, 255) # Default White Text
 ENEMY_COLOUR = (255, 0, 0) # Default Red Enemies
 
+# This is how to add more tower types!
+# Or you can just re-create towers if you don't want to use the defaults
+new_towers = {
+    "Sniper": TowerType(
+        name="Sniper Tower",
+        cost=300,           # Expensive!
+        range=200,          # Huge range
+        damage=100,         # Instantly kills most enemies
+        cooldown_frames=60*5,# Very slow
+        color=(160, 32, 240), # Purple
+        proj_speed=20,      # Bullet travels almost instantly
+        proj_size=3,
+        # Note: We didn't specify valid_tiles, so it uses the default ['T']
+    ),
+    "Rapid": TowerType(
+        name="Rapid Tower",
+        cost=120,
+        range=90,           # Short range
+        damage=4,           # Very weak individual bullets
+        cooldown_frames=8,  # Insanely fast (shoots ~7 times a second)
+        color=(255, 255, 0),# Bright Yellow
+        proj_speed=12,
+        proj_size=2,        # Tiny bullets
+    )}
+TOWERS.update(new_towers)
+
+New_Level = [
+    "TTTTTTTTTTTTTTTTTBBB",
+    "PPPPPPPPPPPPPPPPPPPB",
+    "TTTTTTTTTTTTBBBBBBPB",
+    "TPPPPPPPPPPPPPPPPPPB",
+    "TPTTTTTTTTTTBBBBBBBB",
+    "TPTTTTTTTTTBBBBBBBBB",
+    "TPTTTBBBBBBBBBBBBBBB",
+    "TPPPPPPPPPPPPPPPPPPB",
+    "TTTTTTTBBBBBBBBBBBPB",
+    "TTTTTPPPPPPPPPPPPPPB",
+    "TTTTTPTTTBBBBBBBBBBB",
+    "TTTTTPTTTBBBBBBBBBBT",
+    "TTTTTPTTTBBBBBBBBBBT",
+    "TPPPPPTTTTTBBBBBTTTT",
+    "TPTTTTTTTBBBBBBBBBTT",
+    "TPTTTTTBBBBBBBBBBBBT",
+    "TPTTTTTTTTTBBBBBBTTT",
+    "TPPPPPPPPPPPPPPPPPPP",
+    "TTTTTTTTTTTTTTTTTTTT",
+    "TTTTTTTBBBBBTTTTTTTT",
+]
+
 def get_tile_coords(pos):
     return (pos[0] // BLOCK_SIZE, pos[1] // BLOCK_SIZE)
  
@@ -435,7 +484,7 @@ class Interface(BaseSystem):
             self.buttons.append(button)
 
 
-game_manager = GameManager(LEVEL_MAP) 
+game_manager = GameManager(New_Level) 
 interface = Interface(game_manager)
 
 playing = True

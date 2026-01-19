@@ -66,14 +66,9 @@ class GameManager(BaseSystem):
         for row in self.grid:
             for tile in row:
                 tile.draw(screen)
-
-        for tower in self.towers:
-            tower.draw(screen)
     
         self.enemies.draw(screen)
     def update(self):
-        mouse_pos = pygame.mouse.get_pos()
-        self.towers.update(mouse_pos)
         self.spawner.update()
 
         # Enemy Update & Escape Check
@@ -91,15 +86,6 @@ class GameManager(BaseSystem):
         
         print("Clicked Tile:", row, col)
 
-    def attempt_buy(self, cost):
-        """ Checks if we can afford cost (of tower) """
-        if self.money >= cost:
-            self.money -= cost
-            return True
-        else:
-            print(f"Not enough money! Need ${cost}")
-            return False
-
     def setup_map(self, map): 
         # Iterate over the grid (row, col)
         path_coords = []
@@ -116,17 +102,6 @@ class GameManager(BaseSystem):
             self.grid.append(grid_row)
         self.path = self.sort_path(path_coords, COLS, ROWS, BLOCK_SIZE)
        
-    def get_hovered(self):
-        for tower in self.towers:
-            if tower.is_hovered:
-                return tower
-        return None
-    def is_selected(self, tower_type):
-        """ Returns True if the given tower type is the one currently active. """
-        if self.selected_type == tower_type:
-            return True
-        else:
-            return False
     def create_enemy(self, hp, speed, bounty):
         start_pos = self.path[0]
         new_enemy = Enemy(start_pos.x, start_pos.y, hp, speed, bounty)
@@ -222,13 +197,7 @@ class EnemySpawner:
         # Increase Difficulty: Increase Enemy HP each wave
         hp = ENEMY_HP + (self.wave_number * 5)
         self.manager.create_enemy(hp, ENEMY_SPEED, ENEMY_BOUNTY)
-    @property
-    def get_info_text(self):
-        if self.state == "COUNTDOWN":
-            seconds_left = max(0, self.wave_timer.current_time // 60)
-            return f"Next: {seconds_left}s"
-        else:
-            return f"WAVE {self.wave_number}"
+   
 
 
 game_manager = GameManager(LEVEL_MAP) 

@@ -129,29 +129,6 @@ TOWERS = {
         proj_speed=5,        # Slower projectile
         proj_size=8,
         valid_tiles=['B']
-    ),
-    # 1. The "Sniper": Teaches trade-offs (High Power vs Slow Speed)
-    "Sniper": TowerType(
-        name="Sniper Tower",
-        cost=300,           # Expensive!
-        range=300,          # Huge range (covers half the screen)
-        damage=100,         # Instantly kills basic enemies
-        cooldown_frames=180,# Very slow (shoots once every 3 seconds)
-        color=(160, 32, 240), # Dark Grey
-        proj_speed=20,      # Bullet travels almost instantly
-        proj_size=3,
-        # Note: We didn't specify valid_tiles, so it uses the default ['T']
-    ),
-    # 2. The "Minigun": Teaches DPS (Damage Per Second) vs Burst Damage
-    "Rapid": TowerType(
-        name="Rapid Tower",
-        cost=120,
-        range=90,           # Short range
-        damage=4,           # Very weak individual bullets
-        cooldown_frames=8,  # Insanely fast (shoots ~7 times a second)
-        color=(255, 255, 0),# Bright Yellow
-        proj_speed=12,
-        proj_size=2,        # Tiny bullets
     )
 }
 
