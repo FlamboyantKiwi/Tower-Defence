@@ -146,7 +146,9 @@ class GameManager(UIManager):
             return False
     def create_enemy(self, hp, speed, bounty):
         self.enemies.add(Enemy(hp, speed, bounty, self.path))
-
+    def get_wave_info(self):
+        return self.spawner.get_info_text
+    
 class Enemy(Sprite):
     def __init__(self, health:int, speed:float, bounty:int, path, path_index:int = 0):
         super().__init__(0,0, BLOCK_SIZE, colour=ENEMY_COLOUR) 
@@ -398,12 +400,13 @@ class Interface(UIManager):
         item_to_draw = self.manager.get_hovered() or self.manager.selected_type
         if item_to_draw:
             self.draw_info_panel(screen, item_to_draw, int(money))
-
+            
         # Wave Info
         wave_message = self.manager.get_wave_info()
         self.draw_text(screen, wave_message,(UI_WIDTH//2, 570), colour=(255, 255, 0), center=True)
 
-    def click(self, mouse_pos):
+
+    def click(self, pos):
         """  Handles UI clicks. Returns True even if no button was pressed. """
         for btn in self.buttons:
             if btn.is_clicked(pos):
