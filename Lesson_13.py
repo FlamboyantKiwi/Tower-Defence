@@ -1,20 +1,19 @@
-#Tower Defence
+#Tower Defence: Lesson 13 - Adding UI Functionality
 import pygame, sys
 pygame.init()
 pygame.font.init()
-from TowerBase import BaseSystem, Tile, Sprite, Timer, BaseTower, TowerType, Button, LEVEL_MAP, TOWERS
+from TowerBase import UIManager, Tile, Sprite, Timer, BaseTower, TowerType, Button, LEVEL_MAP, TOWERS, sort_path
 
 #Screen Settings
-WIDTH, HEIGHT = 800, 600 
-BLOCK_SIZE = 30
+MAP_WIDTH, MAP_HEIGHT = 600, 600 
 UI_WIDTH = 200
+BLOCK_SIZE = 30
 
 # Calculated settings - Dont Touch
-MAP_WIDTH = WIDTH - UI_WIDTH
-COLS, ROWS = MAP_WIDTH // BLOCK_SIZE, HEIGHT // BLOCK_SIZE
+COLS, ROWS = MAP_WIDTH // BLOCK_SIZE, MAP_HEIGHT // BLOCK_SIZE
 
 #Initialisation
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+screen = pygame.display.set_mode((MAP_WIDTH+UI_WIDTH, MAP_HEIGHT))
 pygame.display.set_caption("Tower Defence")
 clock = pygame.time.Clock()
 Vector2 = pygame.math.Vector2
@@ -47,11 +46,11 @@ TEXT_COLOR = (255, 255, 255) # Default White Text
 ENEMY_COLOUR = (255, 0, 0) # Default Red Enemies
 
 def get_tile_coords(pos):
-    return (pos[0] // BLOCK_SIZE, pos[1] // BLOCK_SIZE)
+    return (int(pos[0] // BLOCK_SIZE), int(pos[1] // BLOCK_SIZE))
  
-class GameManager(BaseSystem):
+class GameManager(UIManager):
     def __init__(self, map_data=LEVEL_MAP):
-        super().__init__(x=0, y=0, width=MAP_WIDTH, height=HEIGHT)
+        super().__init__(x=0, y=0, width=MAP_WIDTH, height=MAP_HEIGHT)
         self.money = STARTING_MONEY
         self.lives = STARTING_LIVES
         
@@ -80,19 +79,18 @@ class GameManager(BaseSystem):
         mouse_pos = pygame.mouse.get_pos()
         self.towers.update(mouse_pos)
         self.spawner.update()
-
         # Enemy Update & Escape Check
         for enemy in self.enemies:
-            status = enemy.update()
-            if status == 'escaped':
+            enemy.update()
+            if enemy.breached:
                 self.enemies.remove(enemy)
                 self.lives -= 1
                 if self.lives <= 0: 
                     print("GAME OVER")
         return self.lives > 0
 
-    def click(self, mouse_pos):
-        col, row = get_tile_coords(mouse_pos)
+    def click(self, pos):
+        col, row = get_tile_coords(pos)
         
         print("Clicked Tile:", row, col)
         clicked_tile = self.grid[row][col]
@@ -134,7 +132,7 @@ class GameManager(BaseSystem):
 
                 grid_row.append(Tile(col, row, key, BLOCK_SIZE, colour=color))
             self.grid.append(grid_row)
-        self.path = self.sort_path(path_coords, COLS, ROWS, BLOCK_SIZE)
+        self.path = sort_path(path_coords, COLS, ROWS, BLOCK_SIZE)
     def get_hovered(self):
         for tower in self.towers:
             if tower.is_hovered:
@@ -147,16 +145,19 @@ class GameManager(BaseSystem):
         else:
             return False
     def create_enemy(self, hp, speed, bounty):
-        start_pos = self.path[0]
-        new_enemy = Enemy(start_pos.x, start_pos.y, hp, speed, bounty)
-        self.enemies.add(new_enemy)
+        self.enemies.add(Enemy(hp, speed, bounty, self.path))
 
 class Enemy(Sprite):
-    def __init__(self, x, y, health:int, speed:float, bounty:int, path_index:int = 0):
-        super().__init__(x, y, BLOCK_SIZE, colour=ENEMY_COLOUR)
+    def __init__(self, health:int, speed:float, bounty:int, path, path_index:int = 0):
+        super().__init__(0,0, BLOCK_SIZE, colour=ENEMY_COLOUR) 
+        #Reposition enemy
+        self.pos = Vector2(path[path_index])
+        self.rect.center = (int(self.pos.x), int(self.pos.y))  
+        # NOTE: code will still work without this line (self.rect.center)
+        # Enemy will just spawn at topleft of screen (Update function will fix this)
         
         #Movement Variables
-        self.pos = Vector2(x, y) 
+        self.path = path
         self.path_index = path_index
         self.target_node = 0
 
@@ -164,15 +165,18 @@ class Enemy(Sprite):
         self.health = health
         self.speed = speed
         self.bounty = bounty
-        
+        self.breached = False
+                
     def update(self):
-        """ Moves the enemy along the path. Returns 'escaped' or 'moving' """
+        """ Moves the enemy along the path. """
         # If enemy reached the end of the path
-        if self.target_node >= len(game_manager.path):
-            return 'escaped'
+        if self.target_node >= len(self.path):
+            self.breached = True
+            return # Stop function to prevent crashing
         
         # Calculate direction to the next path node
-        target_pos = Vector2(game_manager.path[self.target_node])
+        target_pos = Vector2(self.path[self.target_node])
+        # Vector Math: Target - Current = Direction
         direction = target_pos - self.pos
        
         # Movement Logic
@@ -187,8 +191,7 @@ class Enemy(Sprite):
 
         # Update the visual position
         self.rect.center = (int(self.pos.x), int(self.pos.y))
-        return 'moving' # Indicate normal movement
-
+        
     def hit(self, damage):
         self.health -= damage
         return self.health <= 0 # enemy died
@@ -322,19 +325,18 @@ class Tower(BaseTower):
     def get_upgrade_cost(self):
         # Calculates upgrade cost based current cost and level
         return int(self.type.cost * self.level * 0.7)
-    def get_upgrade_stats(self):
-        return {
-            "damage": int(self.damage * 1.5),
-            "range": self.range + 15,
-            "cooldown": int(self.cooldown_timer.duration * 0.9) 
-        }
+    def get_upgraded_damage(self):
+        return int(self.damage * 1.5)
+    def get_upgraded_range(self):
+        return self.range + 15
+    def get_upgraded_cooldown(self):
+        return int(self.cooldown_timer.duration * 0.9)
+
     def upgrade(self):
-        """ Applies new upgrade stats """
-        new_stats = self.get_upgrade_stats()
-        
-        self.damage = new_stats["damage"]
-        self.range = new_stats["range"]
-        self.cooldown_timer.duration = new_stats["cooldown"]
+        """ Applies new upgrade stats """      
+        self.damage = self.get_upgraded_damage()
+        self.range = self.get_upgraded_range()
+        self.cooldown_timer.duration = self.get_upgraded_cooldown()
         self.level += 1
 
 class Projectile(Sprite):
@@ -360,13 +362,13 @@ class Projectile(Sprite):
         self.pos += self.velocity
         self.rect.center = (int(self.pos.x), int(self.pos.y))
 
-        # Destroy if it flew too far
+        # CLEANUP: Delete bullet if it goes past a certain range
         if self.pos.distance_to(self.spawn_pos) > self.range_limit:
-            self.kill() # Remove sprite from all groups
+            self.kill() # Removes sprite from all groups
 
-class Interface(BaseSystem):
+class Interface(UIManager):
     def __init__(self, game_manager):
-        super().__init__(MAP_WIDTH, 0, UI_WIDTH, HEIGHT)
+        super().__init__(MAP_WIDTH, 0, UI_WIDTH, MAP_HEIGHT)
         self.font = pygame.font.SysFont(None, 24)
         self.manager = game_manager
         self.buttons = []
@@ -376,6 +378,7 @@ class Interface(BaseSystem):
         mouse_pos = pygame.mouse.get_pos()
         for btn in self.buttons:
             btn.update(mouse_pos)
+        return True
             
     def draw(self, screen):
         # Sidebar Background
@@ -396,10 +399,10 @@ class Interface(BaseSystem):
         if item_to_draw:
             self.draw_info_panel(screen, item_to_draw, int(money))
 
-    def click(self, mouse_pos):
+    def click(self, pos):
         """  Handles UI clicks. Returns True even if no button was pressed. """
         for btn in self.buttons:
-            if btn.is_clicked(mouse_pos):
+            if btn.is_clicked(pos):
                 # Update Game Logic
                 self.manager.selected_type = btn.type
                 print(f"Selected: {btn.type.name}")
@@ -408,11 +411,6 @@ class Interface(BaseSystem):
                 for other_btn in self.buttons:
                     other_btn.is_selected = False 
                 btn.is_selected = True            
-                return True 
-        
-        # If we are here, we clicked the grey background, but not a button.
-        # We still return True to stop the click from passing through to the map.
-        return True
 
     def create_buttons(self):            
         for i, t_type in enumerate(TOWERS.values()):
@@ -430,9 +428,9 @@ class Interface(BaseSystem):
             self.buttons.append(button)
 
 
-game_manager = GameManager(LEVEL_MAP) 
+game_manager = GameManager() 
 interface = Interface(game_manager)
-
+sections = [game_manager, interface]
 playing = True
 while playing:
     dt = clock.tick(FPS)
@@ -441,7 +439,7 @@ while playing:
             playing = False
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             # Iterate through systems to see which one was clicked
-            for ui in [game_manager, interface]:
+            for ui in sections:
                 if ui.is_clicked(event.pos):
                     ui.click(event.pos)
                     break # Stop checking other systems if one handled it
@@ -453,7 +451,7 @@ while playing:
 
     # Draw the map
     screen.fill(BG_COLOR)
-    for ui in [game_manager, interface]:
+    for ui in sections:
         ui.draw(screen)
     pygame.display.update()
 

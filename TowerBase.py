@@ -1,5 +1,6 @@
 import pygame, os
 from dataclasses import dataclass, field
+from enum import Enum
 Vector2 = pygame.math.Vector2
 Surf = pygame.surface.Surface
 Colour = tuple[int,int,int]
@@ -70,13 +71,18 @@ class TowerType:
     def ui_footer(self): return "(Click to Build)"
     @property
     def ui_cooldown(self): return self.cooldown_frames
+    
+    def can_afford(self, current_money: int) -> bool:
+        """ Returns True if the player has enough money for the next upgrade. """
+        return current_money >= self.ui_cost
 
 @dataclass
 class Info:
     text: str
+    value: int|str|None = ""
+    next_value: str | None = None
     colour: tuple = TEXT
     padding: int = 0
-    prev: str | None = None
 
 # --- Game Data ---
 LEVEL_MAP = [
@@ -129,29 +135,6 @@ TOWERS = {
         proj_speed=5,        # Slower projectile
         proj_size=8,
         valid_tiles=['B']
-    ),
-    # 1. The "Sniper": Teaches trade-offs (High Power vs Slow Speed)
-    "Sniper": TowerType(
-        name="Sniper Tower",
-        cost=300,           # Expensive!
-        range=300,          # Huge range (covers half the screen)
-        damage=100,         # Instantly kills basic enemies
-        cooldown_frames=180,# Very slow (shoots once every 3 seconds)
-        color=(160, 32, 240), # Dark Grey
-        proj_speed=20,      # Bullet travels almost instantly
-        proj_size=3,
-        # Note: We didn't specify valid_tiles, so it uses the default ['T']
-    ),
-    # 2. The "Minigun": Teaches DPS (Damage Per Second) vs Burst Damage
-    "Rapid": TowerType(
-        name="Rapid Tower",
-        cost=120,
-        range=90,           # Short range
-        damage=4,           # Very weak individual bullets
-        cooldown_frames=8,  # Insanely fast (shoots ~7 times a second)
-        color=(255, 255, 0),# Bright Yellow
-        proj_speed=12,
-        proj_size=2,        # Tiny bullets
     )
 }
 
@@ -322,8 +305,12 @@ class BaseTower(Sprite, Clickable):
             return self.get_upgrade_cost() # type: ignore
         print("Create 'get_upgrade_cost' function")
         return 9999
-
-class BaseSystem:
+    
+    def can_afford(self, current_money: int) -> bool:
+        """ Returns True if the player has enough money for the next upgrade. """
+        return current_money >= self.ui_cost
+    
+class UIManager:
     INFO_RECT = pygame.Rect(10, 350, 180, 175)
     """ A parent class that enforces the structure for any major game component."""
     def __init__(self, x:int, y:int, width:int, height:int):
@@ -332,7 +319,7 @@ class BaseSystem:
         pass
 
     def is_clicked(self, pos:Pos): return self.rect.collidepoint(pos)
-    def update(self): return True
+    def update(self) -> bool: return True
     def draw(self, screen:Surf): pass
     def click(self, pos:Pos): pass
 
@@ -373,33 +360,41 @@ class BaseSystem:
         if border_colour is not None and border_width > 0:
             pygame.draw.rect(screen, border_colour, target_rect, border_width)
     
-    def draw_info_panel(self, screen:Surf, item, money:int):
+    def draw_info_panel(self, screen:Surf, item, money:int, line_height=25):
         # Determine cost color
         if money >= item.ui_cost: 
             cost_col = AFFORDABLE 
         else: 
             cost_col = EXPENSIVE
         
-        # Get Upgrade Previews (if they exist)
-        info = {}
-        if hasattr(item, "get_upgrade_stats"):
-            info = item.get_upgrade_stats()
+        tower_colour = getattr(item.type, "color", TEXT) 
+        
+        # Helper Function (only for this function)
+        def get_val(method_name):
+            # This function looks for a method name (e.g., "get_upgraded_damage")
+            # If found, it runs it. If not, it returns None.
+            if hasattr(item, method_name):
+                # getattr gets the function, () calls it
+                return getattr(item, method_name)() 
+            return None
         
         # Build the Data List
         # .get() safely handles cases where keys don't exist: prevents crashing
         data = [
-            Info(item.ui_title, item.type.color),
-            Info(f"Dmg: {item.damage}", prev=info.get("damage")),
-            Info(f"Rng: {item.range}",  prev=info.get("range")),
-            Info(f"Cool: {item.ui_cooldown}", prev=info.get("cooldown")),
-            Info(f"Cost: ${item.ui_cost}", cost_col, 10),
-            Info(item.ui_footer, (150, 150, 150)) ]
+            Info(item.ui_title,     colour=tower_colour),
+            Info(f"Dmg: {item.damage}",         next_value=get_val("get_upgraded_damage")),
+            Info(f"Rng: {item.range}",          next_value=get_val("get_upgraded_range")),
+            Info(f"Cool: {item.ui_cooldown}",   next_value=get_val("get_upgraded_cooldown")),
+            Info(f"Cost: ${item.ui_cost}",      colour=cost_col, padding=10),
+            Info(item.ui_footer,    colour=(150, 150, 150)) ]
         
         # Draw Background & Border
+        # We use the item's color for the border so it matches the tower
+        
         self.draw_rect(screen, self.INFO_RECT, 
                        fill_colour=INFO_PANEL, 
-                       border_colour=item.type.color, 
-                       border_width=2)
+                       border_colour=tower_colour, 
+                       border_width=2) 
         
         # Draw Text, line by Line 
         # We start drawing text slightly inside the box (+10 padding)
@@ -410,70 +405,73 @@ class BaseSystem:
             # Access attributes using dot notation (.padding, .text, .color)
             # Add extra padding if the line asks for it
             current_y += line.padding
-
+            
             #Draw Main Text
             self.draw_text(screen, line.text, (text_x, current_y), line.colour)
             
             # Draw Upgrade Previews (with Green Arrow)
-            if line.prev:
+            # If there is a 'next_val', we draw it to the right
+            if line.next_value is not None:
                 width, _ = self.font.size(str(line.text))
                 
                 # Draw the arrow and new value in Green
-                self.draw_text(screen, f" -> {line.prev}", (text_x + width, current_y), UPGRADE)
-            current_y += 25 # move down for next line
-    def sort_path(self, path_coords: list[tuple[int,int]], 
-        grid_cols: int, grid_rows: int, block_size: int
-        ) -> list[Vector2]:
-        """ Sorts the path Coordinates into a sequential list of Vectors. """
-        if not path_coords: 
-            print("Error: No path coordinates found!")
-            return []
-        
-        # --- 1. FIND START NODE ---
-        start_node = path_coords[0]
-        for col, row in path_coords:
-            # Now uses the variables passed in, not global ones
-            if col == 0 or row == 0 or col == grid_cols - 1 or row == grid_rows - 1:
-                start_node = (col, row)
-                break
+                arrow_pos = (text_x + width, current_y)
+                self.draw_text(screen, f" -> {line.next_value}", arrow_pos, UPGRADE)
+            current_y += line_height # move down for next line
+            
+def sort_path(path_coords: list[tuple[int,int]], 
+    grid_cols: int, grid_rows: int, block_size: int) -> list[Vector2]:
+    """ Sorts the path Coordinates into a sequential list of Vectors. """
+    if not path_coords: 
+        print("Error: No path coordinates found!")
+        return []
+    
+    # Find Start Node
+    start_node = path_coords[0]
+    for col, row in path_coords:
+        # Now uses the variables passed in, not global ones
+        if col == 0 or row == 0 or col == grid_cols - 1 or row == grid_rows - 1:
+            start_node = (col, row)
+            break
 
-        # --- 2. SORTING LOGIC ---
-        ordered_path = [start_node]
-        unvisited = set(path_coords)
+    # Start Sorting
+    ordered_path = [start_node]
+    unvisited = set(path_coords)
+    if start_node in unvisited:
         unvisited.remove(start_node)
+    
+    current = start_node
+    while unvisited:
+        col, row = current
+        neighbors = [
+            (col, row - 1), (col, row + 1), 
+            (col - 1, row), (col + 1, row)
+        ]
         
-        current = start_node
-        
-        while unvisited:
-            col, row = current
-            neighbors = [
-                (col, row - 1), (col, row + 1), 
-                (col - 1, row), (col + 1, row)
-            ]
-            
-            found_next = False
-            for n in neighbors:
-                if n in unvisited:
-                    ordered_path.append(n)
-                    unvisited.remove(n)
-                    current = n
-                    found_next = True
-                    break
-            
-            if not found_next:
-                print(f"Path broken at {current}")
+        found_next = False
+        for n in neighbors:
+            if n in unvisited:
+                ordered_path.append(n)
+                unvisited.remove(n)
+                current = n
+                found_next = True
                 break
-
-        # --- 3. CONVERT TO PIXELS ---
-        offset = block_size // 2
-        pixel_path = []
         
-        for col, row in ordered_path:
-            # Use the block_size passed into the function
-            x = (col * block_size) + offset
-            y = (row * block_size) + offset
-            # We assume Vector2 is imported in TowerBase, or use pygame.math.Vector2
-            pixel_path.append(pygame.math.Vector2(x, y))
-            
-        return pixel_path
+        if not found_next:
+            print(f"Path broken at {current}")
+            break
+
+    # Convert from tile coords to pixel coords
+    offset = block_size // 2
+    pixel_path = []
+    
+    for col, row in ordered_path:
+        # Use the block_size passed into the function
+        x = (col * block_size) + offset
+        y = (row * block_size) + offset
+        # We assume Vector2 is imported in TowerBase, or use pygame.math.Vector2
+        pixel_path.append(pygame.math.Vector2(x, y))
+        
+    return pixel_path
+
 
