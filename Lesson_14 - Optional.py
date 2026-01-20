@@ -134,8 +134,8 @@ class GameManager(UIManager):
 
         # Enemy Update & Escape Check
         for enemy in self.enemies:
-            status = enemy.update()
-            if status == 'escaped':
+            enemy.update()
+            if enemy.breached:
                 self.enemies.remove(enemy)
                 self.lives -= 1
                 if self.lives <= 0: 
@@ -173,18 +173,27 @@ class GameManager(UIManager):
 
     def setup_map(self, map): 
         # Iterate over the grid (row, col)
-        path_coords = []
+        self.grid = [] # The main List holding rows of Tile Objects
+        path_coords = [] # Temporary List to store Un-Sorted Enemy Path Coordinates
+        # Iterate through rows (Y-axis)
         for row, row_string in enumerate(map[:ROWS]):
             grid_row = []
+            # Iterate through columns (X-axis) inside that row
             for col, key in enumerate(row_string[:COLS]):
-                color = (100, 100, 100) # Default Gray
-                if key == 'T': color = (0, 150, 20)   # Green
-                elif key == 'P':
+                if key == 'P': 
                     color = (100, 50, 0)   # Brown
-                    path_coords.append((col, row)) # Save coordinate for pathfinding                    
-
+                    path_coords.append((col, row)) # Save coordinate for pathfinding    
+                elif key == 'T': 
+                    color = (0, 150, 20)   # Green
+                elif key == 'B': 
+                    color = (100, 100, 100) # Gray 
+                else:   
+                    color = (255, 0, 255) # Error Colour
+                # Create the Tile object and add it to the temporary row list
                 grid_row.append(Tile(col, row, key, BLOCK_SIZE, colour=color))
+                # Add the finished row to the main grid
             self.grid.append(grid_row)
+            # Organize the path coordinates from Start -> End
         self.path = sort_path(path_coords, COLS, ROWS, BLOCK_SIZE)
     def get_hovered(self):
         for tower in self.towers:
@@ -198,20 +207,23 @@ class GameManager(UIManager):
         else:
             return False
     def create_enemy(self, hp, speed, bounty):
-        start_pos = self.path[0]
-        new_enemy = Enemy(start_pos.x, start_pos.y, hp, speed, bounty)
-        self.enemies.add(new_enemy)
+        self.enemies.add(Enemy(hp, speed, bounty, self.path))
     def get_wave_info(self):
         return self.spawner.get_info_text
 
 # Add Enemy Images (image_name="") 
 # NOTE: Assumes they are in a folder called 'Assets' (can change in TowerBase: line 9)
 class Enemy(Sprite):
-    def __init__(self, x, y, health:int, speed:float, bounty:int, path_index:int = 0):
-        super().__init__(x, y, BLOCK_SIZE, colour=ENEMY_COLOUR, image_name="Bug_1.png")
+    def __init__(self, health:int, speed:float, bounty:int, path, path_index:int = 0):
+        super().__init__(0,0, BLOCK_SIZE, colour=ENEMY_COLOUR, image_name="Bug_1.png") 
+        #Reposition enemy
+        self.pos = Vector2(path[path_index])
+        self.rect.center = (int(self.pos.x), int(self.pos.y))  
+        # NOTE: code will still work without this line (self.rect.center)
+        # Enemy will just spawn at topleft of screen (Update function will fix this)
         
         #Movement Variables
-        self.pos = Vector2(x, y) 
+        self.path = path
         self.path_index = path_index
         self.target_node = 0
 
@@ -219,17 +231,18 @@ class Enemy(Sprite):
         self.health = health
         self.speed = speed
         self.bounty = bounty
-        
         self.breached = False
-        
+                
     def update(self):
-        """ Moves the enemy along the path. Returns 'escaped' or 'moving' """
+        """ Moves the enemy along the path. """
         # If enemy reached the end of the path
-        if self.target_node >= len(game_manager.path):
+        if self.target_node >= len(self.path):
             self.breached = True
+            return # Stop function to prevent crashing
         
         # Calculate direction to the next path node
-        target_pos = Vector2(game_manager.path[self.target_node])
+        target_pos = Vector2(self.path[self.target_node])
+        # Vector Math: Target - Current = Direction
         direction = target_pos - self.pos
        
         # Movement Logic
@@ -244,10 +257,10 @@ class Enemy(Sprite):
 
         # Update the visual position
         self.rect.center = (int(self.pos.x), int(self.pos.y))
-
+        
     def hit(self, damage):
         self.health -= damage
-        return self.health <= 0 # enemy died
+        return self.health <= 0 # did the enemy survive or die?
 
 class EnemySpawner:
     def __init__(self, game_manager):
@@ -288,15 +301,21 @@ class EnemySpawner:
         print(f"Wave {self.wave_number} Started!")
         
         # Increase Difficulty: Add more enemies each wave
-        self.enemies_to_spawn = STARTING_ENEMIES + (self.wave_number * ENEMIES_PER_WAVE)
+        self.enemies_to_spawn = STARTING_ENEMIES + (self.wave_number - 1 * ENEMIES_PER_WAVE)
         
+        # Switch State - start creating enemies
         self.state = "SPAWNING"
         self.spawn_timer.activate()
 
     def spawn_enemy(self):
-        # Increase Difficulty: Increase Enemy HP each wave
-        hp = ENEMY_HP + (self.wave_number * 5)
-        self.manager.create_enemy(hp, ENEMY_SPEED, ENEMY_BOUNTY)
+        # Increase Difficulty!
+        # NOTE: Up to students how difficult they make it and which variables they increase. 
+        # Examples:     (would be good to have values (e.g. 5, 1.2) as easy to change global variables
+        hp = ENEMY_HP + (self.wave_number -1 * 5) 
+        speed = ENEMY_SPEED + (self.wave_number -1 * 1.2)
+        bounty = ENEMY_BOUNTY + (self.wave_number -1 * 2)
+        self.manager.create_enemy(hp, speed, bounty)
+        
     @property
     def get_info_text(self):
         if self.state == "COUNTDOWN":
@@ -506,8 +525,18 @@ while playing:
 
     # Updates
     if playing:
-        playing = game_manager.update()
+        game_active = game_manager.update()
         interface.update()
+        
+        if not game_active: # If update() returned False (Game Over)
+            # Reset the Game Manager (Start fresh)
+            game_manager = GameManager(New_Level) 
+            
+            # Re-connect the Interface to the new Game Manager
+            interface.manager = game_manager 
+            
+            # Update the 'sections' list so we draw the NEW manager, not the old one
+            sections = [game_manager, interface]
 
     # Draw the map
     screen.fill(BG_COLOR)

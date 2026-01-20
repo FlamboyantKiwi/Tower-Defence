@@ -120,18 +120,27 @@ class GameManager(UIManager):
 
     def setup_map(self, map): 
         # Iterate over the grid (row, col)
-        path_coords = []
+        self.grid = [] # The main List holding rows of Tile Objects
+        path_coords = [] # Temporary List to store Un-Sorted Enemy Path Coordinates
+        # Iterate through rows (Y-axis)
         for row, row_string in enumerate(map[:ROWS]):
             grid_row = []
+            # Iterate through columns (X-axis) inside that row
             for col, key in enumerate(row_string[:COLS]):
-                color = (100, 100, 100) # Default Gray
-                if key == 'T': color = (0, 150, 20)   # Green
-                elif key == 'P':
+                if key == 'P': 
                     color = (100, 50, 0)   # Brown
-                    path_coords.append((col, row)) # Save coordinate for pathfinding                    
-
+                    path_coords.append((col, row)) # Save coordinate for pathfinding    
+                elif key == 'T': 
+                    color = (0, 150, 20)   # Green
+                elif key == 'B': 
+                    color = (100, 100, 100) # Gray 
+                else:   
+                    color = (255, 0, 255) # Error Colour
+                # Create the Tile object and add it to the temporary row list
                 grid_row.append(Tile(col, row, key, BLOCK_SIZE, colour=color))
+                # Add the finished row to the main grid
             self.grid.append(grid_row)
+            # Organize the path coordinates from Start -> End
         self.path = sort_path(path_coords, COLS, ROWS, BLOCK_SIZE)
     def create_enemy(self, hp, speed, bounty):
         self.enemies.add(Enemy(hp, speed, bounty, self.path))
@@ -224,16 +233,20 @@ class EnemySpawner:
         print(f"Wave {self.wave_number} Started!")
         
         # Increase Difficulty: Add more enemies each wave
-        self.enemies_to_spawn = STARTING_ENEMIES + (self.wave_number * ENEMIES_PER_WAVE)
+        self.enemies_to_spawn = STARTING_ENEMIES + (self.wave_number - 1 * ENEMIES_PER_WAVE)
         
+        # Switch State - start creating enemies
         self.state = "SPAWNING"
         self.spawn_timer.activate()
 
     def spawn_enemy(self):
-        # Increase Difficulty: Increase Enemy HP each wave
-        hp = ENEMY_HP + (self.wave_number * 5)
-        self.manager.create_enemy(hp, ENEMY_SPEED, ENEMY_BOUNTY)
-
+        # Increase Difficulty!
+        # NOTE: Up to students how difficult they make it and which variables they increase. 
+        # Examples:     (would be good to have values (e.g. 5, 1.2) as easy to change global variables
+        hp = ENEMY_HP + (self.wave_number -1 * 5) 
+        speed = ENEMY_SPEED + (self.wave_number -1 * 1.2)
+        bounty = ENEMY_BOUNTY + (self.wave_number -1 * 2)
+        self.manager.create_enemy(hp, speed, bounty)
 
 class Tower(BaseTower):
     def __init__(self, col, row, tower_type:TowerType = TOWERS["Archer"]):
