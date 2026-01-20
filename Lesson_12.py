@@ -233,13 +233,7 @@ class EnemySpawner:
         # Increase Difficulty: Increase Enemy HP each wave
         hp = ENEMY_HP + (self.wave_number * 5)
         self.manager.create_enemy(hp, ENEMY_SPEED, ENEMY_BOUNTY)
-    @property
-    def get_info_text(self):
-        if self.state == "COUNTDOWN":
-            seconds_left = max(0, self.wave_timer.current_time // 60)
-            return f"Next: {seconds_left}s"
-        else:
-            return f"WAVE {self.wave_number}"
+
 
 class Tower(BaseTower):
     def __init__(self, col, row, tower_type:TowerType = TOWERS["Archer"]):

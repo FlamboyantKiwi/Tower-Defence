@@ -399,7 +399,11 @@ class Interface(UIManager):
         if item_to_draw:
             self.draw_info_panel(screen, item_to_draw, int(money))
 
-    def click(self, pos):
+        # Wave Info
+        wave_message = self.manager.get_wave_info()
+        self.draw_text(screen, wave_message,(UI_WIDTH//2, 570), colour=(255, 255, 0), center=True)
+
+    def click(self, mouse_pos):
         """  Handles UI clicks. Returns True even if no button was pressed. """
         for btn in self.buttons:
             if btn.is_clicked(pos):
