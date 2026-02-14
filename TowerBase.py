@@ -38,7 +38,7 @@ def load_image(filename:str|None, size:tuple[int,int], fallback_colour:Colour):
     except (FileNotFoundError, pygame.error):
         print(f"Warning: Missing '{filename}'. Using colour.")
         return load_colour_surface(fallback_colour, size)
-    
+
 # --- Data Classes ---
 @dataclass
 class TowerType:
@@ -245,6 +245,8 @@ class Tile(Sprite):
         super().__init__(col*BLOCK_SIZE, row*BLOCK_SIZE, BLOCK_SIZE, image_name, colour)
     def draw(self, screen:Surf):
         super().draw(screen)
+        if self.tower:
+            self.tower.draw(screen)
         if GRID_LINES: # Optional Gridlines
             pygame.draw.rect(screen, (50, 50, 50), self.rect, 1)
     def can_place(self, tower_type:TowerType):

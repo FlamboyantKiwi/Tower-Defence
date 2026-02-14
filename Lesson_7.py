@@ -200,7 +200,7 @@ class EnemySpawner:
         print(f"Wave {self.wave_number} Started!")
         
         # Increase Difficulty: Add more enemies each wave
-        self.enemies_to_spawn = STARTING_ENEMIES + (self.wave_number - 1 * ENEMIES_PER_WAVE)
+        self.enemies_to_spawn = STARTING_ENEMIES + ((self.wave_number - 1) * ENEMIES_PER_WAVE)
         
         # Switch State - start creating enemies
         self.state = "SPAWNING"
@@ -210,9 +210,9 @@ class EnemySpawner:
         # Increase Difficulty!
         # NOTE: Up to students how difficult they make it and which variables they increase. 
         # Examples:     (would be good to have values (e.g. 5, 1.2) as easy to change global variables
-        hp = ENEMY_HP + (self.wave_number -1 * 5) 
-        speed = ENEMY_SPEED + (self.wave_number -1 * 1.2)
-        bounty = ENEMY_BOUNTY + (self.wave_number -1 * 2)
+        hp = ENEMY_HP + ((self.wave_number -1) * 5) 
+        speed = ENEMY_SPEED + ((self.wave_number -1) * 1.2)
+        bounty = ENEMY_BOUNTY + ((self.wave_number -1) * 2)
         self.manager.create_enemy(hp, speed, bounty)
    
 

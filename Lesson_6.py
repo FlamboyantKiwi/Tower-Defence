@@ -40,7 +40,6 @@ ENEMY_COLOUR = (255, 0, 0) # Default Red Enemies
 def get_tile_coords(pos):
     return (int(pos[0] // BLOCK_SIZE), int(pos[1] // BLOCK_SIZE))
 
- 
 class GameManager(UIManager):
     def __init__(self, map_data=LEVEL_MAP):
         super().__init__(x=0, y=0, width=MAP_WIDTH, height=MAP_HEIGHT)
