@@ -1,4 +1,4 @@
-from NewBase import TowerType
+from NewBase import TowerType, UpgradeMult
 MAP = [
     "TTTTTTTTTTTTTTTTTTTTTTTT",
     "TBTBTBTTBBTBTBBBTBTBTBTT",
@@ -49,9 +49,11 @@ TOWERS = {
         color=(150, 50, 0),
         proj_speed=5,        # Slower projectile
         proj_size=8,
-        valid_tiles=['B']
+        valid_tiles=['B'],
+        upgrade_mults={
+            UpgradeMult.COST: 1.0, 
+            UpgradeMult.DAMAGE: 1.8, 
+            UpgradeMult.RANGE: 1.0, 
+            UpgradeMult.COOLDOWN: 0.95}
     ),
-    "aest":TowerType("test", 5,5,5,5,(0,0,0)),
-    "Tsst":TowerType("test", 5,5,5,5,(0,0,0)),
-    "Tast":TowerType("test", 5,5,5,5,(0,0,0)),
 }

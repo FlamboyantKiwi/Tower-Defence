@@ -1,8 +1,10 @@
 #Tower Defence: lesson 8: Adding Towers
-import pygame, sys
+import pygame
+import sys
+from TowerBase import UIManager, Tile, Sprite, Timer, BaseTower, TowerType, LEVEL_MAP, TOWERS, sort_path
 pygame.init()
 pygame.font.init()
-from TowerBase import UIManager, Tile, Sprite, Timer, BaseTower, TowerType, LEVEL_MAP, TOWERS, sort_path
+
 
 #Screen Settings
 MAP_WIDTH, MAP_HEIGHT = 600, 600 
@@ -91,7 +93,7 @@ class GameManager(UIManager):
         
         print("Clicked Tile:", row, col)
         clicked_tile = self.grid[row][col]
-        # SCENARIO 1: UPGRADE
+        # CREATE NEW TOWER
         if clicked_tile.can_place(self.selected_type):
             cost = self.selected_type.cost
             

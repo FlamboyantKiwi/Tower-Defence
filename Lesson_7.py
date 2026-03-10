@@ -1,8 +1,9 @@
 #Tower Defence: Lesson 7: Waves of Enemies
-import pygame, sys
+import pygame
+import sys
+from TowerBase import UIManager, Tile, Sprite, Timer, LEVEL_MAP, sort_path
 pygame.init()
 pygame.font.init()
-from TowerBase import UIManager, Tile, Sprite, Timer, LEVEL_MAP, sort_path
 
 #Screen Settings
 MAP_WIDTH, MAP_HEIGHT = 600, 600 
@@ -55,7 +56,7 @@ class GameManager(UIManager):
         self.enemies = pygame.sprite.Group()
         self.towers = pygame.sprite.Group()
 
-        self.spawner = EnemySpawner(self)
+        self.spawner = Spawner(self)
 
         self.setup_map(map_data)
         
@@ -157,7 +158,7 @@ class Enemy(Sprite):
         # Update the visual position
         self.rect.center = (int(self.pos.x), int(self.pos.y))
         
-class EnemySpawner:
+class Spawner:
     def __init__(self, game_manager):
         self.manager = game_manager
         
@@ -180,12 +181,7 @@ class EnemySpawner:
         elif self.state == "SPAWNING":
             if self.spawn_timer.update():
                 self.spawn_enemy()
-                self.enemies_to_spawn -= 1
                 
-                if self.enemies_to_spawn > 0:
-                    self.spawn_timer.activate() # Reset for next enemy
-                else:
-                    self.state = "WAITING" # No more to spawn, now we wait.
 
         # Waiting for player to kill everyone (or for enemies to escape)
         elif self.state == "WAITING":
@@ -214,8 +210,12 @@ class EnemySpawner:
         speed = ENEMY_SPEED + ((self.wave_number -1) * 1.2)
         bounty = ENEMY_BOUNTY + ((self.wave_number -1) * 2)
         self.manager.create_enemy(hp, speed, bounty)
-   
-
+        
+        self.enemies_to_spawn -= 1
+        if self.enemies_to_spawn > 0:
+            self.spawn_timer.activate() # Reset for next enemy
+        else:
+            self.state = "WAITING" # No more to spawn, now we wait.
 
 game_manager = GameManager() 
 sections = [game_manager]

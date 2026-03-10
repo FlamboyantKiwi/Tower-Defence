@@ -1,4 +1,6 @@
-import pygame, os
+import pygame
+import os
+from enum import Enum
 from dataclasses import dataclass, field
 
 Vector2 = pygame.math.Vector2
@@ -6,15 +8,91 @@ Colour = tuple[int,int,int]
 Pos = tuple[int|float, int|float] | Vector2
 
 FOLDER_NAME = "Assets" 
+
+# === Colours === #
 FALLBACK = (255, 0, 255) # Hot Pink
 AFFORDABLE = (0, 255, 0) # Green
 EXPENSIVE = (255, 100, 100) # Red
 SELECTED = (255, 255, 0) # Yellow
 UNSELECTED = (0,0,0) # Black
-HIGHLIGHT = (255, 255, 255) # WHITE
-TEXT = (255,255,255)
-UPGRADE = (0,255,0)
+HIGHLIGHT = (255, 255, 255) # White
+TEXT = (255,255,255) # White
+UPGRADE = (0,255,0) # Green
 
+# === Data Classes === #
+@dataclass
+class Info:
+    text: str
+    next_value: str | int | None = None # The green "upgrade" number
+    colour: tuple = (255, 255, 255)     # Default White
+    padding: int = 0
+
+class UpgradeMult(float, Enum):
+    """Global scaling multipliers applied when a tower levels up."""
+    COST = 0.7   
+    DAMAGE = 1.5   
+    RANGE = 1.2    
+    COOLDOWN = 0.9 
+
+@dataclass
+class TowerType:
+    """Stores the fixed statistics for a specific type of tower."""
+    name: str
+    cost: int
+    range: int
+    damage: int
+    cooldown_frames: int
+    color: tuple
+
+    # Optional  Settings
+    proj_image_file = None
+    proj_speed: float = 5
+    proj_size: int = 5
+
+    # Factory prevents all towers sharing the same list in memory
+    valid_tiles:list[str] = field(default_factory=lambda: ['T'])
+
+    image_file:str|None = None
+    
+    upgrade_mults: dict[UpgradeMult, float] = field(default_factory=dict)
+
+
+    def get_ui_details(self) -> list[Info]:
+        return [
+            Info(self.name, colour=self.color),
+            Info(f"Dmg: {self.damage}"),
+            Info(f"Rng: {self.range}"),
+            Info(f"Cool: {self.cooldown_frames}"),
+            Info(f"Cost: ${self.cost}", colour=(255, 215, 0), padding=10), # Gold color
+            Info("(Click to Build)", colour=(150, 150, 150))
+        ]
+
+    def can_afford(self, current_money: int) -> bool:
+        """ Returns True if the player has enough money for the next upgrade. """
+        return current_money >= self.cost
+    
+    def get_upgraded_value(self, current_value, multiplier: float):
+        """ Multiplies a value by an Enum multiplier. """
+        return int(current_value * multiplier)
+    
+    def get_next_stats(self, tower):
+        """Calculates and returns the stats for the next level using Enum keys."""
+        current_values = {
+            UpgradeMult.COST: self.cost * tower.level,
+            UpgradeMult.DAMAGE: tower.damage,
+            UpgradeMult.RANGE: tower.range,
+            UpgradeMult.COOLDOWN: tower.cooldown.duration
+        }
+        next_stats = {}
+        for stat_enum, current_val in current_values.items():
+            multiplier = self.upgrade_mults.get(stat_enum, stat_enum)
+            
+            # Apply the math
+            next_stats[stat_enum] = self.get_upgraded_value(current_val, multiplier)
+            
+        return next_stats
+
+# === Classes === #
 class Timer:
     def __init__(self, duration:int, start_active=False):
         self.duration = duration
@@ -58,153 +136,6 @@ class Clickable:
     def is_clicked(self, mouse_pos:Pos):
         # Returns True if the object was clicked
         return self.rect.collidepoint(mouse_pos)
-    
-def create_solid_surface(colour: Colour, size: tuple[int, int], alpha=255) -> pygame.Surface:
-    """Creates a plain colored square."""
-    surf = pygame.Surface(size)
-    surf.fill(colour)
-    surf.set_alpha(alpha)
-    return surf
-
-def load_surface(size: tuple[int, int], filename: str|None = None, colour: Colour|None = None) -> pygame.Surface:
-    """ Attempts to load an image. 
-    If that fails (or filename is None), it tries the specific 'colour'.
-    If that is None, it defaults to the global FALLBACK_COLOUR. """
-    # Attempt to load Image
-    if filename:
-        path = os.path.join(FOLDER_NAME, filename)
-        try:
-            image = pygame.image.load(path).convert_alpha()
-            return pygame.transform.scale(image, size)
-        except (FileNotFoundError, pygame.error) as e:
-            print(f"Warning: Could not load '{filename}' ({e}). Falling back to colour.")
-
-    # Attempt to use specific Colour (if image failed or wasn't requested)
-    if colour:
-        return create_solid_surface(colour, size)
-
-    # Absolute Fallback (if no image and no colour provided)
-    print("Error: No valid image or colour provided. Using global fallback.")
-    return create_solid_surface(FALLBACK, size)
-
-def get_center(vector:Vector2):
-    return (int(vector.x), int(vector.y))
-
-def get_grid_pos(index:int, cols:int=2, start:Pos=(10, 130), size:Pos=(50, 50), gap:Pos=(10, 10)):
-        """ Calculates the top-left (x, y) for an item in a grid.
-        Args:
-            index (int): The item number (0, 1, 2...)
-            cols (int):  How many items before wrapping to the next row?
-            start (tuple): (x, y) pixel coordinates of the top-left corner.
-            size (tuple):  (width, height) of the item itself.
-            gap (tuple):   (x_gap, y_gap) space between items.
-        """
-        # 1. Logic: Convert linear index (0,1,2,3) to Grid (col, row)
-        current_col = index % cols  
-        current_row = index // cols 
-
-        # 2. Math: Calculate pixel position
-        # Position = Start + (Which Column * (Item Width + Gap Width))
-        x = start[0] + (current_col * (size[0] + gap[0]))
-        y = start[1] + (current_row * (size[1] + gap[1]))
-        
-        return x, y
-
-def sort_path(path_coords: list[tuple[int,int]], 
-    grid_cols: int, grid_rows: int, block_size: int) -> list[Vector2]:
-    """ Sorts the path Coordinates into a sequential list of Vectors. """
-    if not path_coords: 
-        print("Error: No path coordinates found!")
-        return []
-    
-    # Find Start Node
-    start_node = path_coords[0]
-    for col, row in path_coords:
-        # Now uses the variables passed in, not global ones
-        if col == 0 or row == 0 or col == grid_cols - 1 or row == grid_rows - 1:
-            start_node = (col, row)
-            break
-
-    # Start Sorting
-    ordered_path = [start_node]
-    unvisited = set(path_coords)
-    if start_node in unvisited:
-        unvisited.remove(start_node)
-    
-    current = start_node
-    while unvisited:
-        col, row = current
-        neighbors = [
-            (col, row - 1), (col, row + 1), 
-            (col - 1, row), (col + 1, row)
-        ]
-        
-        found_next = False
-        for n in neighbors:
-            if n in unvisited:
-                ordered_path.append(n)
-                unvisited.remove(n)
-                current = n
-                found_next = True
-                break
-        
-        if not found_next:
-            print(f"Path broken at {current}")
-            break
-
-    # Convert from tile coords to pixel coords
-    offset = block_size // 2
-    pixel_path = []
-    
-    for col, row in ordered_path:
-        # Use the block_size passed into the function
-        x = (col * block_size) + offset
-        y = (row * block_size) + offset
-        # We assume Vector2 is imported in TowerBase, or use pygame.math.Vector2
-        pixel_path.append(pygame.math.Vector2(x, y))
-        
-    return pixel_path
-
-@dataclass
-class Info:
-    text: str
-    next_value: str | int | None = None # The green "upgrade" number
-    colour: tuple = (255, 255, 255)     # Default White
-    padding: int = 0
-
-@dataclass
-class TowerType:
-    """Stores the fixed statistics for a specific type of tower."""
-    name: str
-    cost: int
-    range: int
-    damage: int
-    cooldown_frames: int
-    color: tuple
-
-    # Optional  Settings
-    proj_image_file = None
-    proj_speed: float = 5
-    proj_size: int = 5
-
-    # Factory prevents all towers sharing the same list in memory
-    valid_tiles:list[str] = field(default_factory=lambda: ['T'])
-
-    image_file:str|None = None
-
-    def get_ui_details(self) -> list[Info]:
-        return [
-            Info(self.name, colour=self.color),
-            Info(f"Dmg: {self.damage}"),
-            Info(f"Rng: {self.range}"),
-            Info(f"Cool: {self.cooldown_frames}"),
-            Info(f"Cost: ${self.cost}", colour=(255, 215, 0), padding=10), # Gold color
-            Info("(Click to Build)", colour=(150, 150, 150))
-        ]
-
-    def can_afford(self, current_money: int) -> bool:
-        """ Returns True if the player has enough money for the next upgrade. """
-        return current_money >= self.cost
 
 class Button(Clickable):
     def __init__(self, x:int, y:int, size:int, tower_type:TowerType, font:pygame.font.Font, selected=False):
@@ -264,6 +195,111 @@ class Button(Clickable):
             buttons.append(new_btn)
         return buttons
 
+# === Helper Functions === #
+# Create 'Images' 
+def create_solid_surface(colour: Colour, size: tuple[int, int], alpha=255) -> pygame.Surface:
+    """Creates a plain colored square."""
+    surf = pygame.Surface(size)
+    surf.fill(colour)
+    surf.set_alpha(alpha)
+    return surf
+def load_surface(size: tuple[int, int], filename: str|None = None, colour: Colour|None = None) -> pygame.Surface:
+    """ Attempts to load an image. 
+    If that fails (or filename is None), it tries the specific 'colour'.
+    If that is None, it defaults to the global FALLBACK_COLOUR. """
+    # Attempt to load Image
+    if filename:
+        path = os.path.join(FOLDER_NAME, filename)
+        try:
+            image = pygame.image.load(path).convert_alpha()
+            return pygame.transform.scale(image, size)
+        except (FileNotFoundError, pygame.error) as e:
+            print(f"Warning: Could not load '{filename}' ({e}). Falling back to colour.")
+
+    # Attempt to use specific Colour (if image failed or wasn't requested)
+    if colour:
+        return create_solid_surface(colour, size)
+
+    # Absolute Fallback (if no image and no colour provided)
+    print("Error: No valid image or colour provided. Using global fallback.")
+    return create_solid_surface(FALLBACK, size)
+
+# Calculate positions
+def get_center(vector:Vector2):
+    return (int(vector.x), int(vector.y))
+def get_grid_pos(index:int, cols:int=2, start:Pos=(10, 130), size:Pos=(50, 50), gap:Pos=(10, 10)):
+        """ Calculates the top-left (x, y) for an item in a grid."""
+        # Logic: Convert linear index (0,1,2,3) to Grid (col, row)
+        current_col = index % cols  
+        current_row = index // cols 
+
+        # Math: Calculate pixel position
+        # Position = Start + (Which Column * (Item Width + Gap Width))
+        x = start[0] + (current_col * (size[0] + gap[0]))
+        y = start[1] + (current_row * (size[1] + gap[1]))
+        return x, y
+def get_local_pos(global_mouse_pos, global_rect):
+        """ Converts a screen position (610, 50) to a UI position (10, 50) """
+        return (global_mouse_pos[0] - global_rect.x, 
+                global_mouse_pos[1] - global_rect.y)
+
+# Order path locations into a walkable path for enemies
+def sort_path(path_coords: list[tuple[int,int]], 
+    grid_cols: int, grid_rows: int, block_size: int) -> list[Vector2]:
+    """ Sorts the path Coordinates into a sequential list of Vectors. """
+    if not path_coords: 
+        print("Error: No path coordinates found!")
+        return []
+    
+    # Find Start Node
+    start_node = path_coords[0]
+    for col, row in path_coords:
+        # Now uses the variables passed in, not global ones
+        if col == 0 or row == 0 or col == grid_cols - 1 or row == grid_rows - 1:
+            start_node = (col, row)
+            break
+
+    # Start Sorting
+    ordered_path = [start_node]
+    unvisited = set(path_coords)
+    if start_node in unvisited:
+        unvisited.remove(start_node)
+    
+    current = start_node
+    while unvisited:
+        col, row = current
+        neighbors = [
+            (col, row - 1), (col, row + 1), 
+            (col - 1, row), (col + 1, row)
+        ]
+        
+        found_next = False
+        for n in neighbors:
+            if n in unvisited:
+                ordered_path.append(n)
+                unvisited.remove(n)
+                current = n
+                found_next = True
+                break
+        
+        if not found_next:
+            print(f"Path broken at {current}")
+            break
+
+    # Convert from tile coords to pixel coords
+    offset = block_size // 2
+    pixel_path = []
+    
+    for col, row in ordered_path:
+        # Use the block_size passed into the function
+        x = (col * block_size) + offset
+        y = (row * block_size) + offset
+        # We assume Vector2 is imported in TowerBase, or use pygame.math.Vector2
+        pixel_path.append(pygame.math.Vector2(x, y))
+        
+    return pixel_path
+
+# Display helper
 def draw_text(screen, text, pos, font, colour=TEXT, center=False):
     """ Helper to render text to the screen. """
     surf = font.render(str(text), True, colour)
@@ -272,7 +308,6 @@ def draw_text(screen, text, pos, font, colour=TEXT, center=False):
     else:
         rect = surf.get_rect(topleft=pos)
     screen.blit(surf, rect)
-
 def draw_list(screen:pygame.Surface, data_list:list[Info]|list[str], start_pos:Pos, font, colour=TEXT, line_height=25):
     """ Draws a vertical list of text. Converts strings to Info objects automatically. """
     start_x, start_y = start_pos
@@ -294,11 +329,6 @@ def draw_list(screen:pygame.Surface, data_list:list[Info]|list[str], start_pos:P
         draw_text(screen, item.text, (x, y), font, item.colour)
 
         if item.next_value:
-            # FIX: Use 'font', not 'self.font'
             text_width = font.size(item.text)[0]
             draw_text(screen, f"-> {item.next_value}", (x + text_width + 5, y), font, UPGRADE)
 
-def get_local_pos(global_mouse_pos, global_rect):
-        """ Converts a screen position (610, 50) to a UI position (10, 50) """
-        return (global_mouse_pos[0] - global_rect.x, 
-                global_mouse_pos[1] - global_rect.y)

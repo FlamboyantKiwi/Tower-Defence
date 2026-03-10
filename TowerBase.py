@@ -7,7 +7,7 @@ Colour = tuple[int,int,int]
 Pos = tuple[int|float, int|float] | Vector2
 
 FOLDER_NAME = "Assets"
-GRID_LINES = True
+GRID_LINES = False
 
 # --- COLOURs ---
 AFFORDABLE = (0, 255, 0) # Green

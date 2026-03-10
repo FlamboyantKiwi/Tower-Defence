@@ -271,6 +271,7 @@ class Tower(BaseTower):
         screen.blit(self.image, self.rect)
         # Draw the tower's projectiles
         self.projectiles.draw(screen)
+        
     def update(self, mouse_pos):
         super().update(mouse_pos) # Checks if mouse is hovering over us
         self.projectiles.update() # Update all projectiles
@@ -300,15 +301,11 @@ class Tower(BaseTower):
                     furthest_position = enemy.path_index
                     best_target = enemy
         return best_target
+    
     def fire(self, target):
         """Creates a Projectile aimed at the given target."""
-        target_pos = Vector2(target.rect.center)
-        # Calculate angle to point the projectile
-        direction = target_pos - self.center_pos
-        angle = direction.angle_to(Vector2(1, 0)) 
-        # Create Projectile
-        self.projectiles.add(Projectile(self, angle))
-    
+        self.projectiles.add(Projectile(self, Vector2(target.rect.center)))
+
     def get_upgrade_cost(self):
         # Calculates upgrade cost based current cost and level
         return int(self.type.cost * self.level * 0.7)
@@ -327,7 +324,10 @@ class Tower(BaseTower):
         self.level += 1
 
 class Projectile(Sprite):
-    def __init__(self, owner, angle):
+    def __init__(self, owner, target_pos):
+        # Calculate angle to point the projectile
+        direction = target_pos - self.center_pos
+        angle = direction.angle_to(Vector2(1, 0)) 
         self.damage = owner.damage
         self.range_limit = owner.range
         
@@ -351,7 +351,6 @@ class Projectile(Sprite):
         self.rect.center = (int(self.pos.x), int(self.pos.y))
         
         #Will add max range next session
-
 
 
 game_manager = GameManager() 

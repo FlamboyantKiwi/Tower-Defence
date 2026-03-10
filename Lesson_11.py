@@ -1,8 +1,10 @@
 #Tower Defence: Lesson 11 - Damaging Enemies
-import pygame, sys
+import pygame
+import sys
+from TowerBase import UIManager, Tile, Sprite, Timer, BaseTower, TowerType, LEVEL_MAP, TOWERS, sort_path
 pygame.init()
 pygame.font.init()
-from TowerBase import UIManager, Tile, Sprite, Timer, BaseTower, TowerType, LEVEL_MAP, TOWERS, sort_path
+
 
 #Screen Settings
 MAP_WIDTH, MAP_HEIGHT = 600, 600 
@@ -112,7 +114,7 @@ class GameManager(UIManager):
             self.money -= cost
             return True
         else:
-            print(f"Not enough money! Need ${cost}")
+            print(f"Not enough money! Need £{cost}")
             return False
 
     def setup_map(self, map): 
@@ -361,8 +363,6 @@ class Projectile(Sprite):
         # CLEANUP: Delete bullet if it goes past a certain range
         if self.pos.distance_to(self.spawn_pos) > self.range_limit:
             self.kill() # Removes sprite from all groups
-
-
 
 game_manager = GameManager() 
 sections = [game_manager]
