@@ -4,27 +4,28 @@ from enum import Enum
 from dataclasses import dataclass, field
 
 Vector2 = pygame.math.Vector2
-Colour = tuple[int,int,int]
+Colour = str | tuple[int, int, int] | pygame.Color
 Pos = tuple[int|float, int|float] | Vector2
 
 FOLDER_NAME = "Assets" 
 
 # === Colours === #
-FALLBACK = (255, 0, 255) # Hot Pink
-AFFORDABLE = (0, 255, 0) # Green
-EXPENSIVE = (255, 100, 100) # Red
-SELECTED = (255, 255, 0) # Yellow
-UNSELECTED = (0,0,0) # Black
-HIGHLIGHT = (255, 255, 255) # White
-TEXT = (255,255,255) # White
-UPGRADE = (0,255,0) # Green
+AFFORDABLE ="#00FF00"    # Green
+EXPENSIVE = "#FF6464"     # Light Red
+SELECTED =  "#FFFF00"      # Yellow
+UPGRADE =   "#00FF00"       # Green
+FALLBACK = "#FF00FF" # Hot Pink
+
+UNSELECTED = "#000000" # Black
+HIGHLIGHT = "#FFFFFF" # White
+TEXT = "#FFFFFF" # White
 
 # === Data Classes === #
 @dataclass
 class Info:
     text: str
     next_value: str | int | None = None # The green "upgrade" number
-    colour: tuple = (255, 255, 255)     # Default White
+    colour: Colour = TEXT    # Default White
     padding: int = 0
 
 class UpgradeMult(float, Enum):
@@ -42,21 +43,23 @@ class TowerType:
     range: int
     damage: int
     cooldown_frames: int
-    color: tuple
+    color: Colour
 
     # Optional  Settings
     proj_image_file = None
     proj_speed: float = 5
     proj_size: int = 5
+    
+    # The absolute fastest this tower is allowed to fire/generate
+    min_cooldown: int = 10
 
     # Factory prevents all towers sharing the same list in memory
-    valid_tiles:list[str] = field(default_factory=lambda: ['T'])
+    valid_tiles:list[str] = field(default_factory=lambda: ['1'])
 
     image_file:str|None = None
     
     upgrade_mults: dict[UpgradeMult, float] = field(default_factory=dict)
-
-
+    is_farm:bool = False
     def get_ui_details(self) -> list[Info]:
         return [
             Info(self.name, colour=self.color),
@@ -67,14 +70,6 @@ class TowerType:
             Info("(Click to Build)", colour=(150, 150, 150))
         ]
 
-    def can_afford(self, current_money: int) -> bool:
-        """ Returns True if the player has enough money for the next upgrade. """
-        return current_money >= self.cost
-    
-    def get_upgraded_value(self, current_value, multiplier: float):
-        """ Multiplies a value by an Enum multiplier. """
-        return int(current_value * multiplier)
-    
     def get_next_stats(self, tower):
         """Calculates and returns the stats for the next level using Enum keys."""
         current_values = {
@@ -86,9 +81,11 @@ class TowerType:
         next_stats = {}
         for stat_enum, current_val in current_values.items():
             multiplier = self.upgrade_mults.get(stat_enum, stat_enum)
+            new_value = int(current_val * multiplier)
             
-            # Apply the math
-            next_stats[stat_enum] = self.get_upgraded_value(current_val, multiplier)
+            if stat_enum == UpgradeMult.COOLDOWN: # enforce a speed limit
+                new_value = max(self.min_cooldown, new_value)
+            next_stats[stat_enum] = new_value
             
         return next_stats
 
@@ -175,7 +172,7 @@ class Button(Clickable):
                  self.font, price_color, center=True)
 
     @classmethod
-    def create_grid(cls, towers:dict, start_x:int, start_y:int, cols:int, size:int, gap:tuple[int,int], font:pygame.font.Font) -> list["Button"]:
+    def create_grid(cls, towers:dict, start_x:int, start_y:int, cols:int, size:int, gap:tuple[int,int], font:pygame.font.Font, selected_type:TowerType|None=None) -> list["Button"]:
         """  Takes a list of TowerTypes and returns a list of Button objects 
         arranged in a grid. """
         buttons = []
@@ -189,9 +186,12 @@ class Button(Clickable):
             x = start_x + (col * (size + gap[0]))
             y = start_y + (row * (size + gap[1]))
             
+            #Check if this tower matches our starting selection
+            is_default = (t_type == selected_type)
+            
             # Create the Button 
             # 'cls' is a reference to the Button class itself
-            new_btn = cls(x, y, size, t_type, font)
+            new_btn = cls(x, y, size, t_type, font, selected=is_default)
             buttons.append(new_btn)
         return buttons
 
@@ -300,7 +300,7 @@ def sort_path(path_coords: list[tuple[int,int]],
     return pixel_path
 
 # Display helper
-def draw_text(screen, text, pos, font, colour=TEXT, center=False):
+def draw_text(screen, text, pos, font, colour:Colour=TEXT, center=False):
     """ Helper to render text to the screen. """
     surf = font.render(str(text), True, colour)
     if center:

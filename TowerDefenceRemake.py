@@ -1,6 +1,6 @@
 import pygame
 from base import Timer, TowerType, Button, sort_path, draw_list, get_local_pos
-from levelInfo import MAP, TOWERS
+from levelInfo import MAP, TOWERS, PATH, get_colour
 from sprites import Tile, Enemy, Tower
 pygame.init()
 Vector2 = pygame.math.Vector2
@@ -38,8 +38,12 @@ ENEMY_HP_INCREASE = 5
 
 BTN_SIZE = 50
 
-UI_BG = (50,50,60) # dark sidebar background
-ENEMY = (255, 0, 0)
+WHITE = "#FFFFFF"
+BLACK = "#000000"
+UI_BG = "#32323C"       # Sidebar background
+PANEL_BG = "#1E1E1E"    # Info panel background
+GOLD = "#FFD700"        # Used for money/cost
+GRAY_TEXT = "#969696"   # Used for subtext
 
 class Spawner:
     def __init__(self, game_manager):
@@ -160,11 +164,12 @@ class GameManager:
         if not self.global_rect.collidepoint(global_mouse_pos):
             return # Clicked outside the map
 
-        # 2. Convert to Local Coordinates
+        # Convert to Local Coordinates
         local_pos = get_local_pos(global_mouse_pos, self.global_rect)
         col = local_pos[0] // BLOCK_SIZE
         row = local_pos[1] // BLOCK_SIZE
         
+        #Skip if outside map
         if 0 > row >= ROWS or 0 > col >= COLS: 
             return
 
@@ -174,16 +179,13 @@ class GameManager:
             self.selected_object = tile.tower # Select existing
             
             # Simple Upgrade on click (for now)
-            cost = tile.tower.get_upgrade_cost()
-            if self.money >= cost:
-                self.money -= cost
+            if self.can_afford(tile.tower.get_upgrade_cost()):
                 tile.tower.upgrade()
                 print(f"Upgraded to Level {tile.tower.level}")
 
         elif self.selected_type and tile.can_place(self.selected_type):
             # Build new
-            if self.money >= self.selected_type.cost:
-                self.money -= self.selected_type.cost
+            if self.can_afford(self.selected_type.cost):
                 tower = tile.add_tower(self.selected_type)
                 self.towers.add(tower)
                 print(f"Built {self.selected_type.name}")
@@ -193,26 +195,27 @@ class GameManager:
             if tower.is_hovered: 
                 return tower
         return None
-
+    
+    def can_afford(self, cost):
+        if self.money >= cost:
+            self.money -= cost
+            return True
+        print(f"Not enough money. Need: £{cost}")
+        return False
+        
     def setup_map(self, map_data):
         self.grid = []
         path_coords = []
         
-        for row_idx, row_str in enumerate(map_data):
+        for row, tile_string in enumerate(map_data):
             tile_row = []
-            for col_idx, char in enumerate(row_str):
+            for col, tile_value in enumerate(tile_string):
                 # Simple color coding for the map
-                if char == 'P':   
-                    c = (194, 178, 128) # Sand/Path
-                    path_coords.append((col_idx, row_idx))
-                elif char == 'T': 
-                    c = (34, 139, 34)   # Grass
-                elif char == 'B': 
-                    c = (100, 100, 100) # Base/Block
-                else:             
-                    c = (255, 0, 255)
+                c = get_colour(tile_value)
+                if tile_value == PATH:   
+                    path_coords.append((col, row))
                 
-                tile_row.append(Tile(col_idx, row_idx, char, BLOCK_SIZE, colour=c))
+                tile_row.append(Tile(col, row, tile_value, BLOCK_SIZE, colour=c))
             self.grid.append(tile_row)
             
         self.path = sort_path(path_coords, COLS, ROWS, BLOCK_SIZE)
@@ -232,7 +235,9 @@ class Interface:
         
         self.buttons = Button.create_grid(
             towers=TOWERS, start_x=12, start_y=160, cols=3, 
-            size=BTN_SIZE, gap=(10, 25), font=self.font)
+            size=BTN_SIZE, gap=(10, 25), font=self.font, 
+            selected_type=self.manager.selected_type)
+        
         self.info_rect = pygame.Rect(10, 410, 180, 175)
 
     def update(self, mouse_pos):
@@ -243,7 +248,7 @@ class Interface:
     def draw(self):
         self.surface.fill(UI_BG) # Dark Sidebar Background
         # Draw dividing line
-        pygame.draw.line(self.surface, (255, 255, 255), (0, 0), (0, self.local_rect.height), 4)
+        pygame.draw.line(self.surface, WHITE, (0, 0), (0, self.local_rect.height), 4)
 
         stats = [
             f"Money: ${self.manager.money}",
@@ -278,8 +283,8 @@ class Interface:
     def draw_info_panel(self, screen, item:Tower|TowerType):
         """ Draws the info box using the helper 'draw_list' function. """
         actual_type = getattr(item, "type", item)
-        border_col = getattr(actual_type, "color", (255, 255, 255))
-        pygame.draw.rect(screen, (30,30,30), self.info_rect) 
+        border_col = getattr(actual_type, "color", WHITE)
+        pygame.draw.rect(screen, PANEL_BG, self.info_rect) 
         pygame.draw.rect(screen, border_col, self.info_rect, 2) 
 
         if not hasattr(item, "get_ui_details"):
