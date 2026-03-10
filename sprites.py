@@ -1,5 +1,5 @@
 import pygame
-from NewBase import Timer, TowerType, Clickable, Info, UpgradeMult, get_center, load_surface
+from base import Timer, TowerType, Clickable, Info, UpgradeMult, get_center, load_surface
 Vector2 = pygame.math.Vector2
 
 ENEMY = (255, 0, 0)

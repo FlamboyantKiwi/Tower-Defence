@@ -1,4 +1,4 @@
-from NewBase import TowerType, UpgradeMult
+from base import TowerType, UpgradeMult
 MAP = [
     "TTTTTTTTTTTTTTTTTTTTTTTT",
     "TBTBTBTTBBTBTBBBTBTBTBTT",

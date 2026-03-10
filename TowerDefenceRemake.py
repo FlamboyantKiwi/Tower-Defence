@@ -1,5 +1,5 @@
 import pygame
-from NewBase import Timer, TowerType, Button, sort_path, draw_list, get_local_pos
+from base import Timer, TowerType, Button, sort_path, draw_list, get_local_pos
 from levelInfo import MAP, TOWERS
 from sprites import Tile, Enemy, Tower
 pygame.init()
