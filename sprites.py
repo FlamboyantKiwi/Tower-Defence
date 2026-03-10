@@ -2,9 +2,9 @@ import pygame
 from base import Timer, TowerType, Clickable, Info, UpgradeMult, get_center, load_surface
 Vector2 = pygame.math.Vector2
 
-ENEMY = (255, 0, 0)
-GRID_LINES = True
-GRID = (50,50,50)
+ENEMY = "#FF0000"
+GRID = "#323232" # or None to turn off 
+TOWER_RANGE = "#FFFFFF32"
 
 class Tile(pygame.sprite.Sprite):
     def __init__(self, col:int, row:int, type:str, size:int, image_name=None, colour=None):
@@ -16,13 +16,22 @@ class Tile(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(x=col*size, y=row*size)
     def draw(self, screen:pygame.Surface):
         screen.blit(self.image, self.rect)
-        if GRID_LINES:
+        if GRID is not None:
             pygame.draw.rect(screen, GRID, self.rect, 1)
     def can_place(self, tower_type:TowerType):
         return self.tower is None and self.type in tower_type.valid_tiles
-    def add_tower(self, tower_type):
+    def add_tower(self, tower_type): # type: ignore
+        """ Original Code! Without farms """
         self.tower = Tower(self.col, self.row, self.rect.size[0], tower_type)
         return self.tower
+    def add_tower(self, tower_type:TowerType):  # noqa: F811
+        """ Only needed if you're adding in the option to have Farms"""
+        if tower_type.is_farm:
+            self.tower = FarmTower(self.col, self.row, self.rect.size[0], tower_type)
+        else:
+            self.tower = Tower(self.col, self.row, self.rect.size[0], tower_type)
+        return self.tower
+    
 
 class Tower(pygame.sprite.Sprite, Clickable):
     def __init__(self, col, row, size, tower_type:TowerType):
@@ -109,7 +118,7 @@ class Tower(pygame.sprite.Sprite, Clickable):
         # Make a transparent surface
         circle_surf = pygame.Surface((radius*2, radius*2), pygame.SRCALPHA)
         # Draw a grey circle on it
-        pygame.draw.circle(circle_surf, (100, 100, 100, 100), (radius, radius), radius)
+        pygame.draw.circle(circle_surf, pygame.Color(TOWER_RANGE), (radius, radius), radius)
         # Paste it over the tower
         screen.blit(circle_surf, (self.center.x - radius, self.center.y - radius))
 
@@ -120,7 +129,7 @@ class Tower(pygame.sprite.Sprite, Clickable):
         # Access the stats using the Enum directly!
         self.damage = next_stats[UpgradeMult.DAMAGE]
         self.range = next_stats[UpgradeMult.RANGE]
-        self.cooldown_frames = next_stats[UpgradeMult.COOLDOWN]
+        self.cooldown.duration = next_stats[UpgradeMult.COOLDOWN]
         
         self.level += 1
         
@@ -232,3 +241,42 @@ class Enemy(pygame.sprite.Sprite):
     def hit(self, damage):
         self.health -= damage
         return self.health <= 0 # did the enemy survive or die?
+
+
+# Extra Optional Farm Sprite 
+class FarmTower(Tower):
+    def __init__(self, col, row, size, tower_type: TowerType):
+        super().__init__(col, row, size, tower_type)
+        # Repurpose 'damage' as our 'income' amount
+
+    def update(self, mouse_pos, enemy_group):
+        """ The money-making brain. """
+        Clickable.update(self, mouse_pos)
+        
+        money_earned = 0
+        
+        self.cooldown.update() 
+        if not self.cooldown.is_active():
+            # Timer finished, Generate money instead of shooting
+            money_earned += self.damage 
+            self.cooldown.activate() # Reset timer
+
+            print(f"Farm generated ${self.damage}!")
+
+        # Send the paycheck back to the GameManager
+        return money_earned
+
+    def draw_radius(self, screen):
+        pass # Farms don't shoot, so we override this to draw nothing
+
+    def get_ui_details(self) -> list[Info]:
+        """ Override the UI to say 'Income' instead of 'Damage' """
+        next_stats = self.type.get_next_stats(self)
+        
+        return [
+            Info(f"LVL {self.level} {self.type.name}", colour=self.type.color),
+            Info(f"Income: ${self.damage}",           next_value=next_stats[UpgradeMult.DAMAGE]),
+            Info(f"Speed: {self.cooldown.duration}",  next_value=next_stats[UpgradeMult.COOLDOWN]),
+            Info(f"Upg: £{next_stats[UpgradeMult.COST]}", colour="#FFD700", padding=10), 
+            Info("(Click to Upgrade)", colour="#969696")
+        ]
