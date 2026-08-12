@@ -110,7 +110,7 @@ class Tower(pygame.sprite.Sprite, Clickable):
         
         return best_target
     def shoot(self, target_enemy):
-        new_arrow = Projectile.tower_bullet(self, target_enemy)
+        new_arrow = Bullet.tower_bullet(self, target_enemy)
         self.projectiles.add(new_arrow)
     def draw_radius(self, screen):
         """ Helper to draw a transparent circle """
@@ -152,7 +152,7 @@ class Tower(pygame.sprite.Sprite, Clickable):
             Info("(Click to Upgrade)",        colour=(150, 150, 150))
         ]
 
-class Projectile(pygame.sprite.Sprite):
+class Bullet(pygame.sprite.Sprite):
     def __init__(self, start_pos:Vector2, target_pos:Vector2, damage, speed, range, image):
         super().__init__()
         self.damage = damage

@@ -94,9 +94,9 @@ class Spawner:
         # Increase Difficulty!
         # NOTE: Up to students how difficult they make it and which variables they increase. 
         # Examples:     (would be good to have values (e.g. 5, 1.2) as easy to change global variables
-        hp = ENEMY_HP + (self.wave_number -1 * 5) 
-        speed = ENEMY_SPEED + (self.wave_number -1 * 1.2)
-        bounty = ENEMY_BOUNTY + (self.wave_number -1 * 2)
+        hp = ENEMY_HP + ((self.wave_number -1) * 5) 
+        speed = ENEMY_SPEED + ((self.wave_number -1) * 1.2)
+        bounty = ENEMY_BOUNTY + ((self.wave_number -1) * 2)
         self.manager.create_enemy(hp, speed, bounty)
         
     def get_info_text(self):
